@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quant Portfolio Analysis</title>
+    <script src="https://cdn.plot.ly/plotly-2.20.0.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .chart-container { height: 300px; width: 100%; }
+            .matrix-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <div class="max-w-7xl mx-auto p-4 md:p-8">
+        <!-- 标题区域 -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Permanent Portfolio Analysis</h1>
+            <p class="text-gray-600 mt-2">Quantitative Finance - Portfolio Management & Rebalancing</p>
+        </div>
+
+        <!-- 参数配置区域 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Custom Parameters</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 初始资产配置 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Initial - Stocks</label>
+                    <input type="number" id="init-stocks" value="250" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Initial - Bonds</label>
+                    <input type="number" id="init-bonds" value="250" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Initial - Gold</label>
+                    <input type="number" id="init-gold" value="250" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Initial - Cash</label>
+                    <input type="number" id="init-cash" value="250" class="w-full p-2 border rounded">
+                </div>
+
+                <!-- 当前资产配置 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Current - Stocks</label>
+                    <input type="number" id="curr-stocks" value="250" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Current - Bonds</label>
+                    <input type="number" id="curr-bonds" value="250" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Current - Gold</label>
+                    <input type="number" id="curr-gold" value="250" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Current - Cash</label>
+                    <input type="number" id="curr-cash" value="250" class="w-full p-2 border rounded">
+                </div>
+
+                <!-- 调仓参数 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">New Fund Added</label>
+                    <input type="number" id="new-fund" value="1000" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Target Ratio (%)</label>
+                    <input type="number" id="target-ratio" value="25" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Upper Threshold (%)</label>
+                    <input type="number" id="upper-thresh" value="35" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Lower Threshold (%)</label>
+                    <input type="number" id="lower-thresh" value="15" class="w-full p-2 border rounded">
+                </div>
+
+                <!-- 历史数据（示例） -->
+                <div class="md:col-span-4">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Historical Data (JSON Format)</label>
+                    <textarea id="history-data" rows="4" class="w-full p-2 border rounded">
+{
+    "2026-01-01": [250, 250, 250, 250],
+    "2026-02-01": [260, 255, 248, 250],
+    "2026-03-01": [275, 258, 245, 250],
+    "2026-04-01": [268, 260, 252, 250],
+    "2026-05-01": [255, 259, 258, 250],
+    "2026-06-01": [250, 255, 250, 250]
+}
+                    </textarea>
+                </div>
+            </div>
+            <button onclick="calculateAndRender()" class="mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
+                Run Analysis
+            </button>
+        </div>
+
+        <!-- 结果输出区域 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Performance Metrics</h2>
+            <div id="metrics-output" class="text-gray-800 space-y-2"></div>
+        </div>
+
+        <!-- 矩阵图表区域 -->
+        <div class="matrix-grid mb-8">
+            <!-- 图表1: 当前持仓饼图 -->
+            <div class="bg-white rounded-lg shadow-md p-4"><div id="chart1" class="chart-container"></div></div>
+            <!-- 图表2: 调仓后持仓饼图 -->
+            <div class="bg-white rounded-lg shadow-md p-4"><div id="chart2" class="chart-container"></div></div>
+            <!-- 图表3: 组合总值趋势 -->
+            <div class="bg-white rounded-lg shadow-md p-4"><div id="chart3" class="chart-container"></div></div>
+            <!-- 图表4: 单资产趋势 -->
+            <div class="bg-white rounded-lg shadow-md p-4"><div id="chart4" class="chart-container"></div></div>
+            <!-- 图表5: 最大回撤 -->
+            <div class="bg-white rounded-lg shadow-md p-4"><div id="chart5" class="chart-container"></div></div>
+            <!-- 图表6: 资产价值对比 -->
+            <div class="bg-white rounded-lg shadow-md p-4"><div id="chart6" class="chart-container"></div></div>
+            <!-- 图表7: 调仓调整金额 -->
+            <div class="bg-white rounded-lg shadow-md p-4"><div id="chart7" class="chart-container"></div></div>
+            <!-- 图表8: 涨跌热力图 -->
+            <div class="bg-white rounded-lg shadow-md p-4"><div id="chart8" class="chart-container"></div></div>
+            <!-- 图表9: 绩效指标汇总 -->
+            <div class="bg-white rounded-lg shadow-md p-4"><div id="chart9" class="chart-container flex items-center justify-center"></div></div>
+        </div>
+    </div>
+
+    <script>
+        // 核心计算函数
+        function calculatePortfolioMetrics() {
+            const INITIAL = [
+                parseFloat(document.getElementById('init-stocks').value),
+                parseFloat(document.getElementById('init-bonds').value),
+                parseFloat(document.getElementById('init-gold').value),
+                parseFloat(document.getElementById('init-cash').value)
+            ];
+            const CURRENT = [
+                parseFloat(document.getElementById('curr-stocks').value),
+                parseFloat(document.getElementById('curr-bonds').value),
+                parseFloat(document.getElementById('curr-gold').value),
+                parseFloat(document.getElementById('curr-cash').value)
+            ];
+            const NEW_FUND = parseFloat(document.getElementById('new-fund').value);
+            const TARGET_RATIO = parseFloat(document.getElementById('target-ratio').value) / 100;
+            const UPPER_THRESHOLD = parseFloat(document.getElementById('upper-thresh').value) / 100;
+            const LOWER_THRESHOLD = parseFloat(document.getElementById('lower-thresh').value) / 100;
+            const HISTORY_DATA = JSON.parse(document.getElementById('history-data').value.trim());
+            const ASSETS = ['Stocks', 'Bonds', 'Gold', 'Cash'];
+            const COLORS = ['#FF9999', '#66B3FF', '#99FF99', '#FFCC99'];
+
+            // 基础计算
+            const totalInitial = INITIAL.reduce((a, b) => a + b, 0);
+            const totalCurrent = CURRENT.reduce((a, b) => a + b, 0);
+            const totalReturn = (totalCurrent - totalInitial) / totalInitial || 0;
+            const annualizedReturn = totalReturn;
+            const RISK_FREE_RATE = 0.03;
+
+            // 处理历史数据
+            const historyDates = Object.keys(HISTORY_DATA);
+            const historyValues = historyDates.map(date => HISTORY_DATA[date]);
+            const historyTotals = historyValues.map(v => v.reduce((a, b) => a + b, 0));
+
+            // 修复：涨跌幅计算（确保行列对应：行=资产，列=日期）
+            const historyReturnsPct = ASSETS.map((_, assetIdx) => {
+                const assetReturns = [];
+                // 第一列（第一个日期）涨跌幅为0
+                assetReturns.push(0);
+                for (let dateIdx = 1; dateIdx < historyDates.length; dateIdx++) {
+                    const prevVal = historyValues[dateIdx - 1][assetIdx];
+                    const currVal = historyValues[dateIdx][assetIdx];
+                    const change = ((currVal - prevVal) / prevVal) * 100;
+                    assetReturns.push(Math.round(change * 100) / 100);
+                }
+                return assetReturns;
+            });
+
+            // 波动率计算
+            const historyPeriodReturns = [];
+            for (let i = 1; i < historyTotals.length; i++) {
+                historyPeriodReturns.push((historyTotals[i] - historyTotals[i-1]) / historyTotals[i-1] || 0);
+            }
+            const stdDev = historyPeriodReturns.length > 0
+                ? Math.sqrt(historyPeriodReturns.reduce((acc, val) => {
+                    const mean = historyPeriodReturns.reduce((a,b)=>a+b)/historyPeriodReturns.length;
+                    return acc + Math.pow(val - mean, 2);
+                  }, 0) / historyPeriodReturns.length)
+                : 0;
+            const annualVolatility = stdDev * Math.sqrt(12);
+
+            // 修复：最大回撤计算（确保数组长度与日期一致）
+            const rollingMax = [];
+            let maxVal = historyTotals[0] || 0; // 从第一个数据点开始
+            for (let val of historyTotals) {
+                maxVal = Math.max(maxVal, val);
+                rollingMax.push(maxVal);
+            }
+            const drawdown = historyTotals.map((val, idx) => {
+                return rollingMax[idx] === 0 ? 0 : (val - rollingMax[idx]) / rollingMax[idx];
+            });
+            const maxDrawdown = Math.min(...drawdown) || 0;
+
+            // 绩效指标
+            const sharpeRatio = annualVolatility !== 0 ? (annualizedReturn - RISK_FREE_RATE) / annualVolatility : 0;
+            const calmarRatio = Math.abs(maxDrawdown) !== 0 ? annualizedReturn / Math.abs(maxDrawdown) : 0;
+
+            // 调仓逻辑
+            const currentRatios = CURRENT.map(v => v / totalCurrent);
+            const needRebalance = currentRatios.some(r => r > UPPER_THRESHOLD || r < LOWER_THRESHOLD);
+            const totalAfterNew = totalCurrent + NEW_FUND;
+            const targetValues = Array(4).fill(totalAfterNew * TARGET_RATIO);
+            const postRebalanceValues = needRebalance
+                ? targetValues
+                : CURRENT.map((v, idx) => v + NEW_FUND * currentRatios[idx]);
+            const adjustments = postRebalanceValues.map((v, idx) => v - CURRENT[idx]);
+
+            return {
+                initial: INITIAL,
+                current: CURRENT,
+                postRebalance: postRebalanceValues,
+                totalInitial,
+                totalCurrent,
+                totalAfterNew,
+                totalReturn,
+                annualizedReturn,
+                annualVolatility,
+                maxDrawdown,
+                sharpeRatio,
+                calmarRatio,
+                needRebalance,
+                adjustments,
+                historyDates,
+                historyValues,
+                historyTotals,
+                drawdown,
+                historyReturnsPct, // 修复后：行=资产，列=日期
+                assets: ASSETS,
+                colors: COLORS,
+                newFund: NEW_FUND
+            };
+        }
+
+        // 渲染图表函数
+        function renderCharts(results) {
+            // 图表1: 当前持仓饼图
+            Plotly.newPlot('chart1', [{
+                values: results.current,
+                labels: results.assets,
+                type: 'pie',
+                marker: {colors: results.colors},
+                textinfo: 'percent+label'
+            }], {
+                title: `Current Allocation<br>Total: ${results.totalCurrent.toFixed(0)}`,
+                height: 300,
+                showlegend: false
+            });
+
+            // 图表2: 调仓后持仓饼图
+            Plotly.newPlot('chart2', [{
+                values: results.postRebalance,
+                labels: results.assets,
+                type: 'pie',
+                marker: {colors: results.colors},
+                textinfo: 'percent+label'
+            }], {
+                title: `Rebalanced Allocation<br>Total: ${results.totalAfterNew.toFixed(0)} (New Fund: ${results.newFund.toFixed(0)})`,
+                height: 300,
+                showlegend: false
+            });
+
+            // 图表3: 组合总值趋势
+            Plotly.newPlot('chart3', [{
+                x: results.historyDates,
+                y: results.historyTotals,
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: {color: '#2E86AB', width: 2.5},
+                marker: {size: 8}
+            }], {
+                title: 'Total Portfolio Value Trend',
+                height: 300,
+                xaxis: {tickangle: 45},
+                yaxis: {title: 'Total Value'}
+            });
+
+            // 图表4: 单资产趋势
+            const assetTraces = results.assets.map((asset, idx) => ({
+                x: results.historyDates,
+                y: results.historyValues.map(v => v[idx]),
+                name: asset,
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: {color: results.colors[idx], width: 2},
+                marker: {size: 6}
+            }));
+            Plotly.newPlot('chart4', assetTraces, {
+                title: 'Individual Asset Value Trend',
+                height: 300,
+                xaxis: {tickangle: 45},
+                legend: {orientation: 'h', y: -0.2}
+            });
+
+            // 修复：最大回撤图表（确保数据非空）
+            Plotly.newPlot('chart5', [{
+                x: results.historyDates,
+                y: results.drawdown.map(d => d * 100),
+                type: 'scatter',
+                mode: 'lines',
+                line: {color: '#F18F01', width: 2.5},
+                fill: 'tozeroy',
+                fillcolor: 'rgba(241, 143, 1, 0.3)'
+            }], {
+                title: 'Portfolio Drawdown Trend',
+                height: 300,
+                xaxis: {tickangle: 45},
+                yaxis: {title: 'Drawdown (%)'},
+                // 确保y轴显示负数（回撤是负的）
+                yaxis: {range: [Math.min(...results.drawdown.map(d=>d*100)) - 2, 0]}
+            });
+
+            // 图表6: 资产价值对比
+            const x = results.assets;
+            const traceInitial = {x, y: results.initial, type: 'bar', name: 'Initial', marker: {color: '#FF9999', opacity: 0.8}};
+            const traceCurrent = {x, y: results.current, type: 'bar', name: 'Current', marker: {color: '#66B3FF', opacity: 0.8}};
+            const traceRebalanced = {x, y: results.postRebalance, type: 'bar', name: 'Rebalanced', marker: {color: '#99FF99', opacity: 0.8}};
+            Plotly.newPlot('chart6', [traceInitial, traceCurrent, traceRebalanced], {
+                title: 'Asset Value Comparison',
+                height: 300,
+                barmode: 'group',
+                legend: {orientation: 'h', y: -0.2}
+            });
+
+            // 图表7: 调仓调整金额
+            const adjColors = results.adjustments.map(adj => adj > 0 ? 'green' : adj < 0 ? 'red' : 'gray');
+            Plotly.newPlot('chart7', [{
+                x: results.assets,
+                y: results.adjustments,
+                type: 'bar',
+                marker: {color: adjColors, opacity: 0.8},
+                text: results.adjustments.map(a => a.toFixed(0)),
+                textposition: 'auto'
+            }], {
+                title: 'Rebalancing Adjustments (+Add/-Reduce)',
+                height: 300,
+                yaxis: {title: 'Adjustment Amount'},
+                shapes: [{
+                    type: 'line',
+                    x0: -0.5, x1: 3.5, y0: 0, y1: 0,
+                    line: {color: 'black', width: 1, dash: 'solid'}
+                }]
+            });
+
+            // Chart 8: Asset Price Change Heatmap - ±10% range, green for rise/red for drop
+const heatmapData = [{
+    z: results.historyReturnsPct,  // Rows=assets, Columns=dates
+    x: results.historyDates,       // X-axis: dates
+    y: results.assets.map(asset => {
+        // Map Chinese asset names to English
+        const assetMap = {
+            '股票': 'Stocks',
+            '债券': 'Bonds',
+            '黄金': 'Gold',
+            '现金': 'Cash'
+        };
+        return assetMap[asset] || asset;
+    }),                           // Y-axis: English asset names
+    type: 'heatmap',
+    // Custom color scale: red (drop) → yellow (flat) → green (rise) (±10% range)
+    colorscale: [
+        [0.0, '#b71c1c'],     // Dark red (-10% and below)
+        [0.1, '#e53935'],     // Red (-8%)
+        [0.2, '#f44336'],     // Light red (-6%)
+        [0.3, '#ef5350'],     // Light red (-4%)
+        [0.4, '#ffccbc'],     // Light orange (near flat, -2%)
+        [0.5, '#fff9c4'],     // Yellow (0%, flat)
+        [0.6, '#e8f5e9'],     // Light yellow-green (near flat, +2%)
+        [0.7, '#81c784'],     // Light green (+4%)
+        [0.8, '#4caf50'],     // Green (+6%)
+        [0.9, '#2e7d32'],     // Dark green (+8%)
+        [1.0, '#1b5e20']      // Darkest green (+10% and above)
+    ],
+    zmin: -10,                     // Min range: -10% (maximum drop)
+    zmax: 10,                      // Max range: +10% (maximum rise)
+    zmid: 0,                       // 0% as color boundary (red/green split)
+    text: results.historyReturnsPct.map(assetRow =>
+        assetRow.map(v => v.toFixed(1) + '%')
+    ),
+    texttemplate: '%{text}',       // Show percentage in cells
+    textfont: {size: 10, color: '#333'}, // Dark text for readability
+    hovertemplate: 'Date: %{x}<br>Asset: %{y}<br>Change: %{z:.1f}%<extra></extra>',
+    // Color bar with clear ticks for ±10% range
+    colorbar: {
+        title: 'Change (%)',
+        tickvals: [-10, -8, -5, 0, 5, 8, 10],
+        ticktext: ['-10%', '-8%', '-5%', '0%', '+5%', '+8%', '+10%'],
+        len: 0.9,
+        thickness: 15,
+        tickfont: {size: 9}
+    }
+}];
+
+Plotly.newPlot('chart8', heatmapData, {
+    title: 'Asset Price Change Heatmap (%)<br>(Red = Drop, Green = Rise)',
+    height: 300,
+    xaxis: {tickangle: 45, title: 'Date'},
+    yaxis: {title: 'Asset Type'},
+    margin: {t: 60, l: 80, r: 60}, // Right margin for color bar
+    coloraxis: {autocolorscale: false} // Disable auto color scaling
+});
+
+            // 图表9: 绩效指标汇总
+            const metricsText = `
+                <div class="text-left p-4">
+                    <h3 class="font-semibold mb-2">Performance Summary</h3>
+                    <p>• Total Return: ${(results.totalReturn * 100).toFixed(1)}%</p>
+                    <p>• Annualized Return: ${(results.annualizedReturn * 100).toFixed(1)}%</p>
+                    <p>• Annualized Volatility: ${(results.annualVolatility * 100).toFixed(1)}%</p>
+                    <p>• Max Drawdown: ${(results.maxDrawdown * 100).toFixed(1)}%</p>
+                    <p>• Sharpe Ratio: ${results.sharpeRatio.toFixed(2)}</p>
+                    <p>• Calmar Ratio: ${results.calmarRatio.toFixed(2)}</p>
+                    <p>• Rebalancing Needed: ${results.needRebalance ? 'YES' : 'NO'}</p>
+                </div>
+            `;
+            document.getElementById('chart9').innerHTML = metricsText;
+
+            // 输出文本结果
+            const metricsOutput = `
+                <p><strong>Basic Values:</strong> Initial Total = ${results.totalInitial.toFixed(0)}, Current Total = ${results.totalCurrent.toFixed(0)}</p>
+                <p><strong>Total Return:</strong> ${(results.totalReturn * 100).toFixed(1)}%</p>
+                <p><strong>Annualized Return:</strong> ${(results.annualizedReturn * 100).toFixed(1)}%</p>
+                <p><strong>Annualized Volatility:</strong> ${(results.annualVolatility * 100).toFixed(1)}%</p>
+                <p><strong>Max Drawdown:</strong> ${(results.maxDrawdown * 100).toFixed(1)}%</p>
+                <p><strong>Sharpe Ratio:</strong> ${results.sharpeRatio.toFixed(2)}</p>
+                <p><strong>Calmar Ratio:</strong> ${results.calmarRatio.toFixed(2)}</p>
+                <p><strong>Rebalancing Needed:</strong> ${results.needRebalance ? 'YES' : 'NO'}</p>
+                <p><strong>Rebalancing Adjustments:</strong><br>
+                    ${results.assets.map((a, idx) => `${a}: ${results.adjustments[idx] > 0 ? '+' : ''}${results.adjustments[idx].toFixed(0)}`).join('<br>')}
+                </p>
+            `;
+            document.getElementById('metrics-output').innerHTML = metricsOutput;
+        }
+
+        // 主函数：计算并渲染
+        function calculateAndRender() {
+            try {
+                const results = calculatePortfolioMetrics();
+                renderCharts(results);
+            } catch (e) {
+                alert('Error: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        // 页面加载时默认执行一次
+        window.onload = calculateAndRender;
+    </script>
+</body>
+</html>
